@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug API (Express)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/api/src/server.js",
+      "cwd": "${workspaceFolder}/api",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug Web (Next.js)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}/web",
+      "serverReadyAction": {
+        "pattern": "- Local:.+(https?://\\S+)",
+        "uriFormat": "%s",
+        "action": "openExternally"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug API + Web",
+      "configurations": ["Debug API (Express)", "Debug Web (Next.js)"]
+    }
+  ]
+}

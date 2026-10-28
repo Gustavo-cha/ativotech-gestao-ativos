@@ -1,0 +1,16 @@
+{
+  "name": "ativotech",
+  "version": "6.0.0",
+  "private": true,
+  "description": "AtivoTech — solicitações, estoque e envio de equipamentos (Next.js + Node.js/Express)",
+  "scripts": {
+    "setup": "npm install && npm install --prefix api && npm install --prefix web",
+    "dev": "concurrently -n API,WEB -c blue,green \"npm run dev --prefix api\" \"npm run dev --prefix web\"",
+    "test": "npm test --prefix api",
+    "seed": "npm run seed --prefix api",
+    "criar-admin": "npm run criar-admin --prefix api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Instalar dependências",
+      "type": "shell",
+      "command": "npm run setup",
+      "problemMatcher": []
+    },
+    {
+      "label": "Rodar API + Web",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "Testar API",
+      "type": "shell",
+      "command": "npm test",
+      "problemMatcher": [],
+      "group": "test"
+    }
+  ]
+}

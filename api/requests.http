@@ -1,0 +1,364 @@
+### Testes manuais da API — abra no VS Code com a extensão "REST Client" e clique em "Send Request".
+### Não existem contas de demonstração: use o administrador inicial (api/.env ou npm run criar-admin)
+### e os usuários que ele criar em Gerenciamento de Usuários. Troque os e-mails e senhas abaixo.
+@base = http://localhost:3001/api
+@emailTi = gusilva@hco.com
+@senhaTi = SUA_SENHA
+@emailRh = solicitante@hco.com
+@senhaRh = SENHA_DO_SOLICITANTE
+
+### Etapa 1: o prefixo da empresa é válido?
+GET {{base}}/auth/empresa?prefixo=H%26CO
+
+### Métodos de login disponíveis (Microsoft configurado?)
+GET {{base}}/auth/metodos
+
+### Etapa 2: login no Portal do Operador (perfil "ti")
+# @name login
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{emailTi}}", "senha": "{{senhaTi}}", "prefixo": "H&CO", "perfil": "ti" }
+
+### Login no Portal do Solicitante (perfil "rh")
+# @name loginRh
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{emailRh}}", "senha": "{{senhaRh}}", "prefixo": "H&CO", "perfil": "rh" }
+
+@token = {{login.response.body.token}}
+@tokenRh = {{loginRh.response.body.token}}
+
+### Quem sou eu
+GET {{base}}/auth/me
+Authorization: Bearer {{token}}
+
+############ SOLICITAÇÕES (RH → TI) ############
+
+### RH: o que pode ser pedido e quanto há disponível
+# @name catalogo
+GET {{base}}/solicitacoes/catalogo
+Authorization: Bearer {{tokenRh}}
+
+### RH: abrir solicitação (envio para endereço). Troque o itemId por um "item:..." do catálogo.
+# @name novaSol
+POST {{base}}/solicitacoes
+Authorization: Bearer {{tokenRh}}
+Content-Type: application/json
+
+{
+  "nomeAdmitido": "Carlos Andrade",
+  "departamento": "Financeiro",
+  "cargo": "Analista Financeiro",
+  "dataAdmissao": "2026-12-01",
+  "tipo": "Nova admissão",
+  "observacoes": "Entregar em horário comercial.",
+  "itens": [
+    { "tipo": "ativo", "categoria": "Notebook", "quantidade": 1, "especificacao": "16 GB de RAM" },
+    { "tipo": "acessorio", "itemId": "{{catalogo.response.body.$[4].itemId}}", "quantidade": 1 }
+  ],
+  "entrega": {
+    "modalidade": "envio", "cep": "01310-100", "logradouro": "Av. Paulista", "numero": "1000",
+    "complemento": "Apto 12", "bairro": "Bela Vista", "cidade": "São Paulo", "uf": "SP", "telefone": "(11) 98765-4321"
+  }
+}
+
+@sol = {{novaSol.response.body.id}}
+
+### RH: minhas solicitações
+GET {{base}}/solicitacoes?minhas=1
+Authorization: Bearer {{tokenRh}}
+
+### RH: estoque resumido (sem patrimônio/série)
+GET {{base}}/estoque/resumo
+Authorization: Bearer {{tokenRh}}
+
+### RH tentando registrar entrada no estoque → 403
+POST {{base}}/estoque/itens/qualquer/movimentar
+Authorization: Bearer {{tokenRh}}
+Content-Type: application/json
+
+{ "tipo": "entrada", "quantidade": 10 }
+
+### TI: canal em tempo real (mantém aberto e mostra os eventos; cancele para encerrar)
+GET {{base}}/stream
+Authorization: Bearer {{token}}
+
+### TI: solicitações novas (ainda não abertas pela TI)
+GET {{base}}/solicitacoes?status=novas
+Authorization: Bearer {{token}}
+
+### TI: marcar como vista (tira o destaque "NOVA")
+POST {{base}}/solicitacoes/{{sol}}/visto
+Authorization: Bearer {{token}}
+
+### TI: iniciar análise
+PATCH {{base}}/solicitacoes/{{sol}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "Em análise", "mensagem": "Recebido! Vamos separar os itens." }
+
+### TI: reservar automaticamente tudo o que houver disponível
+POST {{base}}/solicitacoes/{{sol}}/reservar-tudo
+Authorization: Bearer {{token}}
+
+### TI: observação interna (o RH não vê)
+POST {{base}}/solicitacoes/{{sol}}/notas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "texto": "Instalar VPN e pacote Office." }
+
+### TI: preparação (exige todos os itens reservados)
+PATCH {{base}}/solicitacoes/{{sol}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "Em preparação" }
+
+### TI: registrar envio (transportadora e data obrigatórias)
+PATCH {{base}}/solicitacoes/{{sol}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "Enviado", "envio": { "transportadora": "Correios (SEDEX)", "codigoRastreio": "QB123456789BR", "dataEnvio": "2026-10-26", "previsaoEntrega": "2026-10-28" } }
+
+### TI: confirmar entrega
+PATCH {{base}}/solicitacoes/{{sol}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "Entregue", "recebidoPor": "Portaria do prédio" }
+
+### TI: rejeitar (antes do envio; devolve as reservas ao estoque)
+POST {{base}}/solicitacoes/{{sol}}/rejeitar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "motivo": "Vaga cancelada pela área." }
+
+############ ESTOQUE ############
+
+### TI: acessórios por quantidade
+# @name itens
+GET {{base}}/estoque/itens
+Authorization: Bearer {{token}}
+
+### TI: entrada de estoque
+POST {{base}}/estoque/itens/{{itens.response.body.$[0].id}}/movimentar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "tipo": "entrada", "quantidade": 10, "motivo": "NF 4521" }
+
+### TI: saída (motivo obrigatório; nunca maior que o disponível)
+POST {{base}}/estoque/itens/{{itens.response.body.$[0].id}}/movimentar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "tipo": "saida", "quantidade": 1, "motivo": "Defeito" }
+
+### TI: novo item
+POST {{base}}/estoque/itens
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "nome": "Webcam Full HD", "categoria": "Periférico", "quantidade": 5, "minimo": 2, "localizacao": "Almoxarifado TI" }
+
+### TI: movimentações (filtros: tipo, itemId, ativoId, solicitacaoId)
+GET {{base}}/estoque/movimentacoes?limite=50
+Authorization: Bearer {{token}}
+
+### TI: integridade das reservas
+GET {{base}}/estoque/consistencia
+Authorization: Bearer {{token}}
+
+### TI: conferência física do almoxarifado
+POST {{base}}/estoque/conferencia
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "patrimonios": ["TI-0019", "TI-0020"], "observacao": "Inventário mensal" }
+
+############ GERENCIAMENTO DE USUÁRIOS E LICENÇAS (Operador administrador) ############
+
+### Troca da própria senha (obrigatória no primeiro acesso)
+POST {{base}}/auth/senha
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "atual": "{{senhaTi}}", "nova": "NovaSenha#2026", "confirmacao": "NovaSenha#2026" }
+
+### Listar usuários (com licença, situação, criado em, último acesso)
+GET {{base}}/usuarios
+Authorization: Bearer {{token}}
+
+### Criar Solicitante com senha temporária gerada (devolvida UMA vez em "senhaTemporaria")
+# @name novoUsuario
+POST {{base}}/usuarios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "nome": "Bianca Rocha", "email": "bianca.rocha@hco.com", "perfil": "rh", "departamento": "Recursos Humanos", "acesso": "gerar", "licenca": { "status": "ativa" } }
+
+### Criar Operador sem permissão administrativa, só login Microsoft, licença pendente
+POST {{base}}/usuarios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "nome": "Carlos Operador", "email": "carlos@hco.com", "perfil": "ti", "admin": false, "acesso": "microsoft", "licenca": { "status": "pendente" } }
+
+### Licença: ativa | pendente | suspensa (validaAte opcional)
+PATCH {{base}}/usuarios/{{novoUsuario.response.body.id}}/licenca
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "ativa", "validaAte": "2027-12-31" }
+
+### Redefinir senha (sem corpo = gera uma temporária)
+POST {{base}}/usuarios/{{novoUsuario.response.body.id}}/senha
+Authorization: Bearer {{token}}
+
+### Desativar a conta
+PATCH {{base}}/usuarios/{{novoUsuario.response.body.id}}/ativo
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "ativo": false }
+
+### Licenças: contratadas, em uso e disponíveis
+GET {{base}}/licencas
+Authorization: Bearer {{token}}
+
+### Ajustar a quantidade contratada
+PUT {{base}}/licencas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "total": 15 }
+
+############ NOTIFICAÇÕES POR E-MAIL (Operador administrador) ############
+
+### Configuração do serviço (sem segredos) e contagem da fila
+GET {{base}}/notificacoes/status
+Authorization: Bearer {{token}}
+
+### Fila (status=enviado|pendente|falhou|nao_configurado)
+GET {{base}}/notificacoes?status=falhou
+Authorization: Bearer {{token}}
+
+### Enviar e-mail de teste para mim
+POST {{base}}/notificacoes/teste
+Authorization: Bearer {{token}}
+
+### Reenviar todas as que falharam ou estavam sem configuração
+POST {{base}}/notificacoes/reenviar
+Authorization: Bearer {{token}}
+
+### Sincronização (revisão atual dos dados)
+GET {{base}}/sync
+Authorization: Bearer {{token}}
+
+############ ATIVOS ############
+
+### Listar (filtros: q, status, categoria, departamento, tag, garantia=vigente|vencendo|vencida|sem, ordem, dir)
+GET {{base}}/ativos?status=Em uso&ordem=valor&dir=desc
+Authorization: Bearer {{token}}
+
+### Listas para formulários (categorias, departamentos, tags…)
+GET {{base}}/ativos/meta
+Authorization: Bearer {{token}}
+
+### Criar
+# @name criarAtivo
+POST {{base}}/ativos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "patrimonio": "TI-0200",
+  "nome": "Monitor Dell 24\"",
+  "categoria": "Monitor",
+  "status": "Disponível",
+  "marca": "Dell",
+  "valor": 1299.90,
+  "dataAquisicao": "2026-01-10",
+  "garantiaAte": "2029-01-10",
+  "tags": ["Novo"]
+}
+
+### Consultar (inclui valorAtual, garantiaStatus, idadeMeses…)
+GET {{base}}/ativos/{{criarAtivo.response.body.id}}
+Authorization: Bearer {{token}}
+
+### Mudar status rápido (usado pelo Quadro)
+PATCH {{base}}/ativos/{{criarAtivo.response.body.id}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "Em uso", "responsavel": "João Silva" }
+
+### Ação em lote
+POST {{base}}/ativos/lote
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "ids": ["{{criarAtivo.response.body.id}}"], "acao": "status", "status": "Em manutenção" }
+
+### Exportar CSV
+GET {{base}}/ativos/export.csv
+Authorization: Bearer {{token}}
+
+### Excluir
+DELETE {{base}}/ativos/{{criarAtivo.response.body.id}}
+Authorization: Bearer {{token}}
+
+
+############ AGENDA ############
+
+### Eventos de um período
+GET {{base}}/eventos?de=2026-10-01&ate=2026-10-31
+Authorization: Bearer {{token}}
+
+### Criar evento
+# @name criarEvento
+POST {{base}}/eventos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "titulo": "Troca de toner", "tipo": "Manutenção", "data": "2026-12-01", "hora": "09:30" }
+
+### Concluir
+PUT {{base}}/eventos/{{criarEvento.response.body.id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "concluido": true }
+
+############ PAINEL / ANÁLISE ############
+
+### Indicadores do painel
+GET {{base}}/dashboard
+Authorization: Bearer {{token}}
+
+### Alertas automáticos
+GET {{base}}/alertas
+Authorization: Bearer {{token}}
+
+### Histórico (entidade=solicitacao|estoque|ativo|evento|usuario, entidadeId, q)
+GET {{base}}/historico?limite=20
+Authorization: Bearer {{token}}
+
+### Busca global (paleta Ctrl+K)
+GET {{base}}/busca?q=dell
+Authorization: Bearer {{token}}
+
+### Backup completo (somente Operador administrador — com o token do RH retorna 403)
+GET {{base}}/admin/backup
+Authorization: Bearer {{token}}
+
+### Restaurar dados de exemplo (somente Operador administrador)
+POST {{base}}/admin/reset
+Authorization: Bearer {{token}}

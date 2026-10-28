@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+.env*.local
+api/data/
+*.log
+.DS_Store
+# Segredos locais (senha inicial do administrador, SMTP, Microsoft Entra ID)
+.env
+api/.env
