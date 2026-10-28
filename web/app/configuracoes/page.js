@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Settings, Palette, Database, Keyboard, User, Sun, Moon, Monitor, Play, DatabaseBackup, RotateCcw, Server, CheckCircle2, XCircle, Info, ShieldCheck, KeyRound, BellRing } from 'lucide-react';
+import { Settings, Palette, Database, Keyboard, User, Sun, Moon, Monitor, Play, DatabaseBackup, RotateCcw, Server, CheckCircle2, XCircle, Info, ShieldCheck, KeyRound, BellRing, Globe, Copy, AlertTriangle } from 'lucide-react';
 import { PageHeader, Switch, Segmented, Field, Avatar, Badge } from '@/components/ui';
 import { useAuth } from '@/components/auth';
 import { useConfig, useUI, useToast, CONFIG_PADRAO } from '@/components/providers';
@@ -13,6 +13,40 @@ import { apitar, desbloquearAudio } from '@/lib/sound';
 function Linha({ titulo, desc, children }) {
   return (
     <div className="setting-row"><div><strong>{titulo}</strong>{desc && <small className="muted">{desc}</small>}</div><div className="setting-ctrl">{children}</div></div>
+  );
+}
+
+// Endereço que outras pessoas usam para abrir o sistema (somente administradores).
+// O site e a API ficam num único servidor; todos os computadores acessam o MESMO endereço e o MESMO banco de dados.
+function EnderecoAcesso({ toast }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => { api.acessoSistema().then(setInfo).catch(() => setInfo({ erro: true })); }, []);
+  if (!info || info.erro) return null;
+  const aqui = window.location.origin;
+  const abertoLocal = /^https?:\/\/(localhost|127\.|\[::1\])/i.test(aqui);
+  const rede = info.rede.filter((e) => !e.virtual);
+  const copiar = (t) => navigator.clipboard?.writeText(t).then(() => toast({ tipo: 'sucesso', titulo: 'Endereço copiado' }));
+  const principal = !info.appUrlLocal ? info.appUrl : rede[0]?.endereco;
+  return (
+    <div className="acesso-box">
+      <Linha titulo={<><Globe size={15} aria-hidden="true" /> Endereço para outras pessoas</>}
+        desc={info.appUrlLocal
+          ? 'Ainda não definido (APP_URL está como localhost). Enquanto isso, quem estiver na mesma rede usa o endereço ao lado.'
+          : 'Endereço oficial (APP_URL), usado também nos links dos e-mails.'}>
+        {principal ? (
+          <span className="acesso-url">
+            <code>{principal}</code>
+            <button type="button" className="icon-btn ghost" onClick={() => copiar(principal)} aria-label="Copiar endereço"><Copy size={15} /></button>
+          </span>
+        ) : <span className="muted small">Sem rede detectada</span>}
+      </Linha>
+      {rede.length > 1 && <p className="muted small acesso-outros">Outros endereços deste servidor: {rede.slice(1).map((e) => e.endereco).join(' · ')}</p>}
+      {(abertoLocal || info.appUrlLocal) && (
+        <p className="acesso-aviso small"><AlertTriangle size={15} aria-hidden="true" />
+          <span>"localhost" só funciona no próprio servidor ({info.servidor}). Nos outros computadores, abra o endereço acima — não instale outra cópia do sistema neles, senão cada cópia terá usuários e dados separados.</span>
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -136,12 +170,13 @@ export default function Configuracoes() {
 
       <section className="card settings-card">
         <h2 className="section-title"><Database size={18} /> Dados {!pode('sistema:admin') && <Badge tom="slate">Somente administradores alteram</Badge>}</h2>
-        <Linha titulo="Conexão com a API" desc={API_URL}>
+        <Linha titulo="Conexão com o servidor" desc={typeof window !== 'undefined' ? `${window.location.origin}${API_URL.startsWith('/') ? API_URL : ''}` : API_URL}>
           <span className={`api-status ${saude?.startsWith('ok') ? 'ok' : saude === 'erro' ? 'err' : ''}`}>
             {saude?.startsWith('ok') ? <><CheckCircle2 size={15} /> Online · v{saude.slice(3)}</> : saude === 'erro' ? <><XCircle size={15} /> Offline</> : <><Server size={15} /> Verificando…</>}
           </span>
           <button type="button" className="btn btn-sm" onClick={testarApi}>Testar</button>
         </Linha>
+        {pode('sistema:admin') && <EnderecoAcesso toast={toast} />}
         {pode('sistema:admin') && <>
           <Linha titulo="Backup completo" desc="Equipamentos, estoque, movimentações, solicitações, eventos, usuários (sem senhas) e histórico em JSON.">
             <button type="button" className="btn btn-sm" onClick={() => api.backup().catch((e) => toast({ tipo: 'erro', titulo: 'Erro no backup', msg: e.message }))}><DatabaseBackup size={14} /> Baixar backup</button>
@@ -160,7 +195,7 @@ export default function Configuracoes() {
         <Linha titulo="Restaurar preferências" desc="Volta tema, cores e sons ao padrão.">
           <button type="button" className="btn btn-sm" onClick={() => { atualizar({ ...CONFIG_PADRAO }); toast({ tipo: 'info', titulo: 'Preferências restauradas' }); }}>Restaurar padrão</button>
         </Linha>
-        <p className="muted small about"><Info size={14} /> Ativos Tech 5.0 · Next.js + Node.js/Express · Solicitações, estoque, envios, usuários e licenças</p>
+        <p className="muted small about"><Info size={14} /> Ativos Tech 6.1 · Next.js + Node.js/Express · Solicitações, estoque, envios, usuários e licenças</p>
       </section>
     </div>
   );

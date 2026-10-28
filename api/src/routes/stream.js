@@ -18,7 +18,9 @@ router.get('/', (req, res) => {
   const operador = pode(usuario, 'solicitacoes:gerenciar');
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-store',
+    // no-transform: impede que o servidor do site (proxy de /api) comprima e segure os eventos — sem isso,
+    // nos outros computadores as atualizações ao vivo não chegariam
+    'Cache-Control': 'no-store, no-transform',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no'
   });

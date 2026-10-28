@@ -1967,3 +1967,13 @@ details[open] > summary .chev { transform: rotate(180deg); }
 .imp-acoes .sel-sm { min-width: 110px; margin: 0; }
 /* Sem entradas animadas de blocos: o conteúdo aparece pronto */
 .tab-panel, .form-section, .area-fill, .st-item, .conf-result, .success-icon, .new-dot, .kcard.just-dropped, .bubble { animation: none; }
+
+/* v6.1 · endereço de acesso (Configurações) */
+.acesso-box { border-top: 1px solid var(--border); }
+.acesso-box .setting-row strong { display: inline-flex; align-items: center; gap: 6px; }
+.acesso-url { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; }
+.acesso-url code { font-family: var(--mono); font-size: .85rem; padding: 4px 8px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); overflow-wrap: anywhere; }
+.acesso-outros { margin: -4px 0 8px; overflow-wrap: anywhere; }
+.acesso-aviso { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 10px; padding: 10px 12px; border-radius: 10px;
+  background: var(--amber-bg); color: var(--amber-fg); border: 1px solid color-mix(in srgb, #f59e0b 35%, transparent); }
+.acesso-aviso svg { flex: none; margin-top: 2px; }

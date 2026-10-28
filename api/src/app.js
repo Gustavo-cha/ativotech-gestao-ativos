@@ -1,6 +1,8 @@
-require('./config');
 const express = require('express');
+const os = require('os');
 const cors = require('cors');
+const config = require('./config');
+const { enderecosRede, ehLocal } = require('./rede');
 const db = require('./db');
 const { autenticar, exigir, exigirSenhaDefinitiva } = require('./auth');
 const { inicializarAdministrador } = require('./administrador');
@@ -27,7 +29,9 @@ function createApp({ iniciarServicos = true } = {}) {
   app.disable('x-powered-by');
   app.set('trust proxy', 'loopback');
 
-  app.use(cors({ origin: process.env.CORS_ORIGIN || true, exposedHeaders: ['X-Rev', 'Content-Disposition'] }));
+  // O navegador fala com a API pelo mesmo endereço do site (/api), então não precisa de CORS.
+  // Só libera outras origens se forem configuradas explicitamente em CORS_ORIGIN.
+  if (config.corsOrigens.length) app.use(cors({ origin: config.corsOrigens, exposedHeaders: ['X-Rev', 'Content-Disposition'] }));
   // (as planilhas de importação chegam como arquivo binário e são lidas só depois do login, na própria rota)
   app.use(express.json({ limit: '1mb' }));
 
@@ -47,7 +51,7 @@ function createApp({ iniciarServicos = true } = {}) {
   });
 
   // ---------- Rotas públicas ----------
-  app.get('/api/health', (_req, res) => res.json({ status: 'ok', servico: 'AtivoTech API', versao: '6.0.0' }));
+  app.get('/api/health', (_req, res) => res.json({ status: 'ok', servico: 'AtivoTech API', versao: '6.1.0' }));
   app.use('/api/auth', authRouter);
 
   // ---------- Daqui para baixo: exige login ----------
@@ -71,6 +75,17 @@ function createApp({ iniciarServicos = true } = {}) {
   app.use('/api/colaboradores', exigir('colaboradores:ver'), colaboradoresRouter);
   app.use('/api/importacao', exigir('importacao:executar'), importacaoRouter);
   app.use('/api', painelRouter);
+
+  // Endereço de acesso: ajuda o administrador a conferir se outras pessoas conseguem abrir o sistema
+  app.get('/api/sistema/acesso', exigir('sistema:admin'), (_req, res) => {
+    res.json({
+      appUrl: config.appUrl,
+      appUrlLocal: ehLocal(config.appUrl),
+      servidor: os.hostname(),
+      rede: enderecosRede(config.portaWeb).map(({ interface: _i, ...r }) => r),
+      microsoftRedirectUri: config.microsoft.redirectUri
+    });
+  });
 
   app.use((_req, res) => res.status(404).json({ erro: 'Rota não encontrada.' }));
 

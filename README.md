@@ -23,15 +23,34 @@ npm run setup     # instala tudo (raiz, api e web)
 Em ambos os casos a senha é gravada só como hash (scrypt) e o sistema **exige a troca no primeiro acesso**.
 
 ```bash
-npm run dev       # sobe API (3001) e front-end (3000)
+npm run dev       # desenvolvimento, só neste computador: sobe API (3001) e front-end (3000)
 ```
 Acesse **http://localhost:3000** → prefixo **H&CO** → **Acessar como Operador (TI)** → entre com o administrador inicial e crie a sua senha. Depois cadastre os demais usuários em **Gestão → Usuários**.
 
 ```bash
-npm test       # 73 testes automatizados da API (fluxo, RBAC, licenças, e-mail SMTP real, login Microsoft, proprietário, colaboradores, importação, migrações)
+npm test       # 76 testes automatizados da API (fluxo, RBAC, licenças, e-mail SMTP real, login Microsoft, proprietário, colaboradores, importação, migrações)
 npm run seed   # restaura os dados de exemplo de equipamentos/estoque/solicitações (usuários e licenças são mantidos)
 ```
 O arquivo `api/requests.http` tem as requisições prontas para a extensão **REST Client**.
+
+## Usar em vários computadores (modo servidor)
+
+O Ativos Tech é um sistema web: ele roda em **um único servidor** e todas as pessoas abrem **o mesmo endereço** no navegador. Usuários, equipamentos e solicitações ficam num só banco de dados (`api/data/db.json`, no servidor).
+
+> ⚠️ **Não instale uma cópia em cada computador.** Cada cópia cria o seu próprio banco: a conta criada no PC não existe na cópia do notebook (aparece "E-mail ou senha incorretos") e os dados nunca se encontram. Nos outros computadores basta o navegador.
+
+No computador ou servidor que vai ficar ligado:
+
+```bash
+npm run setup
+npm run servidor   # prepara o site (build) e inicia API + site em modo produção
+```
+1. **Windows — liberar a porta 3000 na rede** (uma vez, PowerShell como administrador):
+   `powershell -ExecutionPolicy Bypass -File .\scripts\windows\liberar-acesso-rede.ps1` — o script mostra os endereços deste computador (ex.: `http://192.168.0.10:3000`).
+2. Crie `api/.env` (a partir de `api/.env.example`) com `APP_URL=` esse endereço — ele aparece nos links dos e-mails e no login Microsoft. Reinicie.
+3. Nos outros computadores, abra o endereço no navegador e entre com a mesma conta. Em **Configurações → Dados**, o administrador vê o endereço para compartilhar.
+
+Como funciona: o navegador só conversa com o endereço do site; o site repassa `/api` para a API, que escuta apenas no próprio servidor (`127.0.0.1:3001`). Não há `localhost` fixo no código, a porta da API não fica exposta e não é preciso liberar CORS. Para acesso fora da rede da empresa, publique com HTTPS (veja `docs/DEPLOYMENT.md`: VM/servidor com Docker, Cloudflare Tunnel).
 
 > **Atualizando da versão 5?** Descompacte por cima e rode `npm run setup`. Na primeira execução o banco é migrado para a v6 **sem perder dados**: todo equipamento, acessório, solicitação e movimentação existente recebe o proprietário **H&CO** (registrado na Atividade). Corrija o que for da B2Finance em **Inventário → filtro → selecionar → Proprietário** (ação em lote).
 >
@@ -168,7 +187,7 @@ Ninguém promove a si mesmo: perfil e permissão administrativa só mudam por **
 
 > Importação: o arquivo é lido em memória, nunca executado nem gravado como enviado; células são limitadas a 500 caracteres; o relatório CSV neutraliza fórmulas; só Operadores com permissão de cadastro importam, e cada importação fica na auditoria (detalhe em `api/data/importacoes/`).
 >
-> Em produção: use HTTPS, defina `CORS_ORIGIN`, `APP_URL` e `API_PUBLIC_URL` com os endereços reais e considere um banco relacional.
+> Em produção: use HTTPS, defina `APP_URL` com o endereço real e considere um banco relacional. `CORS_ORIGIN` e `API_PUBLIC_URL` só são necessários se a API for publicada em outro domínio.
 
 ## Principais endpoints
 
@@ -235,7 +254,8 @@ gestao-ativos-ti/
 ```
 
 ## Solução de problemas
-- **"Não foi possível conectar à API"** — confira se a API está na porta 3001. Para outra porta, copie `web/.env.local.example` para `web/.env.local` e ajuste `NEXT_PUBLIC_API_URL`.
+- **"Não foi possível conectar ao servidor"** — confira se a API está rodando (porta 3001 no servidor). Para outra porta, defina `API_INTERNAL_URL` em `web/.env.local` e rode o build de novo.
+- **"E-mail ou senha incorretos" só em outro computador** — esse computador está usando uma **cópia própria** do sistema (outro banco). Pare a cópia e abra o endereço do servidor (ex.: `http://192.168.0.10:3000`).
 - **Sem apito** — clique uma vez na página (o botão "Ativar som dos alertas" aparece no topo enquanto o navegador bloquear o áudio) e confira *Configurações → Alerta de novas solicitações*.
 - **Indicador "Sincronizando"** — o canal em tempo real caiu (proxy, rede); o app segue atualizando a cada 4 s e reconecta sozinho.
 - **"Muitas tentativas"** no login — aguarde 5 minutos ou reinicie a API.
@@ -248,9 +268,9 @@ gestao-ativos-ti/
 ## Configurações externas
 
 ### Login com Microsoft (Entra ID)
-1. **Entra ID → Registros de aplicativo → Novo registro**: contas somente deste diretório; Redirect URI (**Web**) = `http://localhost:3001/api/auth/microsoft/callback` (em produção, o endereço público da API).
+1. **Entra ID → Registros de aplicativo → Novo registro**: contas somente deste diretório; Redirect URI (**Web**) = `<APP_URL>/api/auth/microsoft/callback` (ex.: `https://ativos.hco.com/api/auth/microsoft/callback`).
 2. **Certificados e segredos → Novo segredo do cliente**.
-3. Em `api/.env`: `MS_TENANT_ID` (ID do diretório), `MS_CLIENT_ID` (ID do aplicativo), `MS_CLIENT_SECRET`, e `API_PUBLIC_URL` / `APP_URL` com os endereços reais. Reinicie a API.
+3. Em `api/.env`: `MS_TENANT_ID` (ID do diretório), `MS_CLIENT_ID` (ID do aplicativo), `MS_CLIENT_SECRET`, e `APP_URL` com o endereço real. Reinicie a API.
 4. Cadastre as pessoas em **Usuários** com o mesmo e-mail da conta Microsoft (pode ser "somente conta Microsoft"). Quem não estiver cadastrado, ativo e licenciado é recusado mesmo autenticando na Microsoft.
 
 ### Envio de e-mails

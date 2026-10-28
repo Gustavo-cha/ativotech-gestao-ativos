@@ -2,7 +2,10 @@
 // - Envia o token de sessão (Authorization: Bearer)
 // - Em 401, encerra a sessão local e leva ao login
 // - Acompanha a "revisão" dos dados (cabeçalho X-Rev) para a sincronização automática
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+// Padrão: o mesmo endereço em que o site foi aberto (/api). O servidor do site repassa para a API
+// (ver next.config.mjs). Isso faz o sistema funcionar em qualquer computador da rede ou domínio,
+// sem depender de "localhost". NEXT_PUBLIC_API_URL só é necessário se a API estiver em outro domínio.
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\/+$/, '');
 const CHAVE_TOKEN = 'ativotech:token';
 
 export class ApiError extends Error {
@@ -66,7 +69,7 @@ async function request(path, options = {}, aoLer) {
       headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}), ...(options.headers || {}) }
     });
   } catch {
-    throw new ApiError(`Não foi possível conectar à API em ${API_URL}. Ela está rodando?`, 0);
+    throw new ApiError(`Não foi possível conectar ao servidor do Ativos Tech. Verifique a rede ou se o servidor está ligado.`, 0);
   }
   const mutacao = options.method && options.method !== 'GET';
   const revResp = res.headers.get('X-Rev') !== null ? Number(res.headers.get('X-Rev')) : null;
@@ -101,7 +104,7 @@ async function enviarArquivo(path, arquivo) {
     method: 'POST', cache: 'no-store',
     headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/octet-stream', 'X-Arquivo-Nome': encodeURIComponent(arquivo.name) },
     body: arquivo
-  }).catch(() => { throw new ApiError(`Não foi possível conectar à API em ${API_URL}.`, 0); });
+  }).catch(() => { throw new ApiError(`Não foi possível conectar ao servidor do Ativos Tech.`, 0); });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(body.erro || (res.status === 413 ? 'Arquivo grande demais (limite de 12 MB).' : `Erro ${res.status}`), res.status, body.campos);
   return body;
@@ -237,6 +240,7 @@ export const api = {
     desfazer: (id) => request(`/importacao/historico/${id}/desfazer`, { method: 'POST' })
   },
   contadores: () => lerGet('/contadores'),
+  acessoSistema: () => request('/sistema/acesso'),
   dashboard: () => lerGet('/dashboard'),
   alertas: (f) => lerGet(`/alertas${qs(f)}`),
   historico: (f) => lerGet(`/historico${qs(f)}`),

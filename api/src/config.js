@@ -29,8 +29,18 @@ const semBarra = (u) => u.replace(/\/+$/, '');
 
 const config = {
   // Endereços públicos (usados nos links dos e-mails e no retorno do login Microsoft)
-  appUrl: semBarra(env('APP_URL', 'http://localhost:3000')),
-  apiUrl: semBarra(env('API_PUBLIC_URL', `http://localhost:${env('PORT', '3001')}`)),
+  // APP_URL = o endereço que as PESSOAS digitam para abrir o sistema (ex.: http://192.168.0.10:3000 ou https://ativos.hco.com).
+  appUrl: semBarra(env('APP_URL', `http://localhost:${env('WEB_PORT', '3000')}`)),
+  // A API é servida pelo mesmo endereço do site (/api), então o endereço público dela é o próprio APP_URL.
+  // API_PUBLIC_URL só é necessário se a API for publicada em outro domínio.
+  apiUrl: '',
+  // Rede: a API escuta só no próprio servidor (127.0.0.1) — quem fala com ela é o site, que fica exposto na rede.
+  // Use API_HOST=0.0.0.0 apenas se a API precisar ser acessada diretamente por outra máquina.
+  apiHost: env('API_HOST', '127.0.0.1'),
+  porta: Number(env('PORT', '3001')) || 3001,
+  portaWeb: Number(env('WEB_PORT', '3000')) || 3000,
+  // Origens externas autorizadas a chamar a API pelo navegador (CORS). Vazio = somente o próprio site.
+  corsOrigens: lista('CORS_ORIGIN', '').map(semBarra),
 
   // Empresas (prefixos) aceitas na tela de acesso. Por enquanto: somente H&CO.
   empresas: [{ prefixo: 'H&CO', nome: 'H&CO' }],
@@ -79,6 +89,7 @@ const config = {
     }
   }
 };
+config.apiUrl = semBarra(env('API_PUBLIC_URL')) || config.appUrl;
 config.microsoft.redirectUri ||= `${config.apiUrl}/api/auth/microsoft/callback`;
 
 const normPrefixo = (p) => String(p || '').trim().toUpperCase().replace(/\s+/g, '');

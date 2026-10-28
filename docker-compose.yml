@@ -1,0 +1,13 @@
+# Ativos Tech em um servidor (VM da empresa, Oracle Cloud Always Free, etc.)
+#   1) Copie api/.env.example para api/.env e preencha (APP_URL = endereço que as pessoas usam).
+#   2) Para levar os dados atuais: copie a pasta api/data do computador antigo para ./dados
+#   3) docker compose up -d --build
+services:
+  ativos-tech:
+    build: .
+    restart: unless-stopped
+    env_file: ./api/.env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./dados:/app/api/data

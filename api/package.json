@@ -1,13 +1,13 @@
 {
   "name": "ativotech-api",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "API REST (Node.js + Express) para solicitações, estoque, envio de equipamentos, usuários e licenças",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test --test-timeout=60000 tests/api.test.js tests/portal.test.js tests/acesso.test.js tests/email.test.js tests/microsoft.test.js tests/v6.test.js",
+    "test": "node --test --test-timeout=60000 tests/api.test.js tests/portal.test.js tests/acesso.test.js tests/email.test.js tests/microsoft.test.js tests/v6.test.js tests/acesso-rede.test.js",
     "seed": "node src/seed.js",
     "criar-admin": "node src/criar-admin.js"
   },
